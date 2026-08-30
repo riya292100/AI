@@ -1,47 +1,48 @@
 {
-  "app_name": "NexusAI Agent Workspace & Mission Control",
-  "app_type": "saas_app",
-  "context": "Self-directed AI Agent & Autonomous Task Orchestration Workspace",
+  "app_name": "LifeOS",
+  "app_type": "hybrid_fullstack",
+  "theme": "dark_first_obsidian_obsidian_accent",
   "typography": {
     "heading_font": "Plus Jakarta Sans, sans-serif",
     "body_font": "Inter, sans-serif",
     "mono_font": "JetBrains Mono, monospace"
   },
   "colors": {
-    "archetype": "Electric & Cybernetic Dark Mode",
+    "background": "#0B0F17",
+    "card_bg": "#121824",
+    "sidebar": "#0E131F",
+    "border": "#1E293B",
     "primary": "#6366F1",
     "primary_hover": "#4F46E5",
-    "background_dark": "#090A0F",
-    "surface_dark": "#12141C",
-    "surface_card": "#181B26",
-    "border_color": "#262B3D",
+    "accent": "#10B981",
+    "warning": "#F59E0B",
+    "danger": "#EF4444",
     "text_primary": "#F8FAFC",
-    "text_secondary": "#94A3B8",
-    "accent_cyan": "#06B6D4",
-    "accent_emerald": "#10B981",
-    "accent_amber": "#F59E0B"
+    "text_muted": "#94A3B8"
   },
-  "layout": {
-    "structure": "Three-Column Mission Control Workspace (Sidebar Navigation, Central Chat & GenUI Canvas, Right Contextual Inspector & Task Planner)",
-    "spacing_scale": "Tailwind generous scale (p-4, p-6, p-8, gap-6)"
+  "grids": {
+    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "bento_span_hero": "col-span-1 md:col-span-2 lg:col-span-3 row-span-2",
+    "bento_span_widget": "col-span-1"
   },
-  "components": [
-    "AI Chat Workspace with streaming thoughts and GenUI cards",
-    "Autonomous Task Planning Kanban & List Board",
-    "Live Contextual Notes & Knowledge Panel",
-    "Recent Activity & System Audit Log Stream",
-    "Agent Status & Tool-Ready Action Controls",
-    "Human-in-the-loop Approval Gates"
+  "component_path": "/app/frontend/src/components",
+  "image_urls": [
+    {
+      "category": "workspace_hero",
+      "url": "https://images.unsplash.com/photo-1493934558415-9d19f0b2b4d2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwcHJvZHVjdGl2aXR5JTIwZGFzaGJvYXJkJTIwd29ya3NwYWNlfGVufDB8fHx8MTc4ODA1OTMyMXww&ixlib=rb-4.1.0&q=85",
+      "description": "Minimalist workspace setup for hero banners"
+    },
+    {
+      "category": "calendar_notes",
+      "url": "https://images.unsplash.com/photo-1601342630314-8427c38bf5e6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG1vZGVybiUyMGNhbGVuZGFyJTIwbm90ZXMlMjBvcmdhbml6YXRpb258ZW58MHx8fHwxNzg4MDU5MzIxfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Calendar and organization imagery"
+    }
   ],
-  "image_urls": {
-    "neural_network_hero": "https://images.unsplash.com/photo-1674027444485-cec3da58eef4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxmdXR1cmlzdGljJTIwQUklMjBuZXVyYWwlMjBuZXR3b3JrJTIwYWJzdHJhY3QlMjB0ZWNobm9sb2d5fGVufDB8fHx8MTc4ODAxOTc2NXww&ixlib=rb-4.1.0&q=85",
-    "dashboard_analytics": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxkYXNoYm9hcmQlMjBkYXRhJTIwdmlzdWFsaXphdGlvbiUyMGZ1dHVyaXN0aWMlMjBkYXJrJTIwbW9kZXxlbnwwfHx8fDE3ODgwMTk3NDJ8MA&ixlib=rb-4.1.0&q=85",
-    "cyber_abstract": "https://images.unsplash.com/photo-1689443111130-6e9c7dfd8f9e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwyfHxjeWJlcnB1bmslMjBnbG93aW5nJTIwbmVvbiUyMFVJJTIwaW50ZXJmYWNlJTIwYWJzdHJhY3R8ZW58MHx8fHwxNzg4MDE5NzQ2fDA&ixlib=rb-4.1.0&q=85"
-  },
-  "universal_guidelines": {
-    "data_testid_required": true,
-    "no_transparent_overlays": true,
-    "interactive_state_contrast": true,
-    "file_extension": "js"
-  }
+  "universal_guidelines_for_main_agent": [
+    "Never use universal transition like transition: all",
+    "Every interactive element must have hover state and data-testid attribute",
+    "Ensure high contrast text F8FAFC on 121824 cards",
+    "Use sonner for toast notifications",
+    "Provide seamless mobile bottom navigation and floating add button for quick entry"
+  ]
 }

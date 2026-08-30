@@ -12,6 +12,11 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
       },
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Plus Jakarta Sans", "Inter", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
