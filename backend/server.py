@@ -227,12 +227,37 @@ async def register(payload: RegisterInput, response: Response):
     return {"id": user_id, "email": email, "name": doc["name"], "token": token}
 
 
+LOCK_MAX_ATTEMPTS = 5
+LOCK_WINDOW_MIN = 15
+
+
+async def _check_login_lockout(email: str, ip: str) -> Optional[int]:
+    """Return seconds until unlock if locked, else None."""
+    ident = f"{ip}:{email}"
+    since = datetime.now(timezone.utc) - timedelta(minutes=LOCK_WINDOW_MIN)
+    count = await db.login_attempts.count_documents({"identifier": ident, "at": {"$gte": since.isoformat()}})
+    if count >= LOCK_MAX_ATTEMPTS:
+        first = await db.login_attempts.find({"identifier": ident, "at": {"$gte": since.isoformat()}}).sort("at", 1).limit(1).to_list(1)
+        if first:
+            unlock_at = datetime.fromisoformat(first[0]["at"]) + timedelta(minutes=LOCK_WINDOW_MIN)
+            secs = int((unlock_at - datetime.now(timezone.utc)).total_seconds())
+            return max(secs, 1)
+    return None
+
+
 @api.post("/auth/login")
-async def login(payload: LoginInput, response: Response):
+async def login(payload: LoginInput, response: Response, request: Request):
     email = payload.email.lower()
+    ip = request.client.host if request.client else "unknown"
+    ident = f"{ip}:{email}"
+    locked = await _check_login_lockout(email, ip)
+    if locked:
+        raise HTTPException(status_code=429, detail=f"Too many attempts. Try again in {locked // 60 + 1} min.")
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user.get("password_hash", "")):
+        await db.login_attempts.insert_one({"identifier": ident, "at": now_iso()})
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    await db.login_attempts.delete_many({"identifier": ident})
     token = create_access_token(user["id"], email)
     set_auth_cookie(response, token)
     return {"id": user["id"], "email": email, "name": user.get("name"), "token": token}
@@ -598,6 +623,239 @@ async def search(q: str, user=Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Budgets
+# ---------------------------------------------------------------------------
+class BudgetInput(BaseModel):
+    category: str
+    monthly_cap: float
+
+
+@api.get("/budgets")
+async def list_budgets(user=Depends(get_current_user)):
+    uid = user["id"]
+    budgets = await db.budgets.find({"user_id": uid}).to_list(200)
+    # Compute current-month spend per category
+    start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    expenses = await db.expenses.find({"user_id": uid}).to_list(2000)
+    spend = {}
+    for e in expenses:
+        if (e.get("date") or "") >= start:
+            spend[e.get("category")] = spend.get(e.get("category"), 0) + float(e.get("amount", 0))
+    out = []
+    for b in budgets:
+        used = round(spend.get(b["category"], 0), 2)
+        cap = float(b.get("monthly_cap", 0))
+        pct = round((used / cap) * 100, 1) if cap else 0.0
+        out.append({**clean(b), "spent": used, "percent": pct})
+    return out
+
+
+@api.post("/budgets")
+async def create_budget(payload: BudgetInput, user=Depends(get_current_user)):
+    cat = payload.category.strip().lower()
+    existing = await db.budgets.find_one({"user_id": user["id"], "category": cat})
+    if existing:
+        await db.budgets.update_one({"id": existing["id"]}, {"$set": {"monthly_cap": payload.monthly_cap}})
+        doc = await db.budgets.find_one({"id": existing["id"]})
+    else:
+        doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "category": cat, "monthly_cap": payload.monthly_cap, "created_at": now_iso()}
+        await db.budgets.insert_one(doc.copy())
+    return clean(doc)
+
+
+@api.delete("/budgets/{bid}")
+async def delete_budget(bid: str, user=Depends(get_current_user)):
+    res = await db.budgets.delete_one({"id": bid, "user_id": user["id"]})
+    if not res.deleted_count:
+        raise HTTPException(status_code=404, detail="Budget not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Reminders (in-app, computed on demand)
+# ---------------------------------------------------------------------------
+async def compute_reminders(uid: str) -> list:
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    dismissed_docs = await db.dismissed_reminders.find({"user_id": uid}).to_list(2000)
+    dismissed = {d["key"] for d in dismissed_docs}
+
+    items = []
+
+    # Bills due in 0-1 day (unpaid)
+    bills = await db.bills.find({"user_id": uid, "status": {"$ne": "paid"}}).to_list(500)
+    for b in bills:
+        try:
+            dd = datetime.fromisoformat(b["due_date"].replace("Z", "+00:00")).date()
+            days = (dd - today).days
+            if days < 0:
+                key = f"bill-overdue-{b['id']}"
+                if key in dismissed: continue
+                items.append({"id": key, "kind": "bill", "severity": "danger", "title": f"Overdue: {b['name']}", "body": f"${b.get('amount',0):.2f} was due {abs(days)}d ago", "entity_id": b["id"], "when": b["due_date"]})
+            elif days <= 1:
+                key = f"bill-soon-{b['id']}-{today.isoformat()}"
+                if key in dismissed: continue
+                label = "due today" if days == 0 else "due tomorrow"
+                items.append({"id": key, "kind": "bill", "severity": "warn", "title": f"{b['name']} {label}", "body": f"${b.get('amount',0):.2f}", "entity_id": b["id"], "when": b["due_date"]})
+        except Exception:
+            pass
+
+    # Appointments within 24h
+    appts = await db.appointments.find({"user_id": uid}).sort("starts_at", 1).to_list(200)
+    for a in appts:
+        try:
+            starts = datetime.fromisoformat(a["starts_at"].replace("Z", "+00:00"))
+            delta_h = (starts - now).total_seconds() / 3600
+            if 0 <= delta_h <= 24:
+                key = f"appt-{a['id']}"
+                if key in dismissed: continue
+                when_str = starts.strftime("%b %d · %I:%M %p")
+                items.append({"id": key, "kind": "appointment", "severity": "info", "title": a["title"], "body": f"in {int(delta_h)}h · {when_str}", "entity_id": a["id"], "when": a["starts_at"]})
+        except Exception:
+            pass
+
+    # Documents expiring within 30d
+    docs = await db.documents.find({"user_id": uid}).to_list(500)
+    for d in docs:
+        exp = d.get("expiry_date")
+        if not exp: continue
+        try:
+            edate = datetime.fromisoformat(exp).date() if len(exp) == 10 else datetime.fromisoformat(exp.replace("Z", "+00:00")).date()
+            days = (edate - today).days
+            if 0 <= days <= 30:
+                key = f"doc-{d['id']}"
+                if key in dismissed: continue
+                items.append({"id": key, "kind": "document", "severity": "warn" if days <= 7 else "info", "title": f"{d['name']} expires in {days}d", "body": d.get("type", "").capitalize(), "entity_id": d["id"], "when": exp})
+        except Exception:
+            pass
+
+    # Budget threshold alerts (80% and 100%)
+    budgets = await db.budgets.find({"user_id": uid}).to_list(200)
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    expenses = await db.expenses.find({"user_id": uid}).to_list(2000)
+    spend_map = {}
+    for e in expenses:
+        if (e.get("date") or "") >= start:
+            spend_map[e.get("category")] = spend_map.get(e.get("category"), 0) + float(e.get("amount", 0))
+    month_key = now.strftime("%Y-%m")
+    for b in budgets:
+        cap = float(b.get("monthly_cap", 0))
+        if not cap: continue
+        used = spend_map.get(b["category"], 0)
+        pct = (used / cap) * 100
+        if pct >= 100:
+            key = f"budget-100-{b['id']}-{month_key}"
+            if key in dismissed: continue
+            items.append({"id": key, "kind": "budget", "severity": "danger", "title": f"Over budget: {b['category']}", "body": f"${used:.2f} of ${cap:.2f} ({pct:.0f}%)", "entity_id": b["id"], "when": now.isoformat()})
+        elif pct >= 80:
+            key = f"budget-80-{b['id']}-{month_key}"
+            if key in dismissed: continue
+            items.append({"id": key, "kind": "budget", "severity": "warn", "title": f"{b['category']} nearing cap", "body": f"${used:.2f} of ${cap:.2f} ({pct:.0f}%)", "entity_id": b["id"], "when": now.isoformat()})
+
+    # Sort by severity then when
+    sev_rank = {"danger": 0, "warn": 1, "info": 2}
+    items.sort(key=lambda x: (sev_rank.get(x["severity"], 3), x["when"]))
+    return items
+
+
+@api.get("/reminders")
+async def list_reminders(user=Depends(get_current_user)):
+    items = await compute_reminders(user["id"])
+    return {"items": items, "unread": len(items)}
+
+
+class DismissInput(BaseModel):
+    key: str
+
+
+@api.post("/reminders/dismiss")
+async def dismiss_reminder(payload: DismissInput, user=Depends(get_current_user)):
+    await db.dismissed_reminders.update_one(
+        {"user_id": user["id"], "key": payload.key},
+        {"$set": {"user_id": user["id"], "key": payload.key, "at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Real OCR (Emergent LLM vision, Claude Sonnet 4.6)
+# ---------------------------------------------------------------------------
+from fastapi import UploadFile, File
+import base64 as _b64
+import re as _re
+from emergentintegrations.llm.chat import ImageContent
+
+
+@api.post("/documents/ocr")
+async def documents_ocr(file: UploadFile = File(...), user=Depends(get_current_user)):
+    raw = await file.read()
+    if len(raw) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 8 MB)")
+    mime = (file.content_type or "").lower()
+    if not mime.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files supported (jpg, png, webp)")
+
+    b64 = _b64.b64encode(raw).decode("utf-8")
+    image = ImageContent(image_base64=b64)
+
+    prompt = (
+        "You are analyzing a photo of a personal document (ID, insurance card, receipt, warranty, contract). "
+        "Extract these fields and return STRICT JSON only, no prose, no code fences:\n"
+        '{"name": "short human name for the document", '
+        '"type": one of ["id","insurance","warranty","contract","receipt"], '
+        '"expiry_date": ISO date "YYYY-MM-DD" or null if not present, '
+        '"summary": "one short line describing what this is"}'
+    )
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"lifeos-ocr-{user['id']}-{now_iso()}",
+            system_message="Reply with valid JSON only."
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        text = ""
+        async for ev in chat.stream_message(UserMessage(text=prompt, file_contents=[image])):
+            if isinstance(ev, TextDelta):
+                text += ev.content
+            elif isinstance(ev, StreamDone):
+                break
+    except Exception as e:
+        logger.exception("OCR call failed")
+        raise HTTPException(status_code=502, detail=f"OCR service unavailable: {e}")
+
+    # Parse JSON out
+    match = _re.search(r"\{[\s\S]*\}", text)
+    data = {}
+    if match:
+        try:
+            data = json.loads(match.group(0))
+        except Exception:
+            data = {}
+
+    name = (data.get("name") or "Untitled document").strip()
+    dtype = (data.get("type") or "receipt").strip().lower()
+    if dtype not in ("id", "insurance", "warranty", "contract", "receipt"):
+        dtype = "receipt"
+    expiry = data.get("expiry_date")
+    if isinstance(expiry, str) and not _re.match(r"^\d{4}-\d{2}-\d{2}$", expiry):
+        expiry = None
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "name": name,
+        "type": dtype,
+        "expiry_date": expiry,
+        "notes": data.get("summary") or "",
+        "file_url": "",
+        "ocr_raw": text[:600],
+        "created_at": now_iso(),
+    }
+    await db.documents.insert_one(doc.copy())
+    return clean(doc)
+
+
+# ---------------------------------------------------------------------------
 # AI Assistant (Claude Sonnet 4.6, streaming)
 # ---------------------------------------------------------------------------
 async def build_user_context(uid: str) -> str:
@@ -714,7 +972,7 @@ DEMO_PASSWORD = os.environ.get("ADMIN_PASSWORD", "lifeos123")
 
 async def seed_demo():
     await db.users.create_index("email", unique=True)
-    for coll in ("tasks", "bills", "expenses", "documents", "appointments", "habits", "shopping", "ai_messages"):
+    for coll in ("tasks", "bills", "expenses", "documents", "appointments", "habits", "shopping", "ai_messages", "budgets", "dismissed_reminders", "login_attempts"):
         await db[coll].create_index("user_id")
 
     existing = await db.users.find_one({"email": DEMO_EMAIL})
@@ -807,6 +1065,15 @@ async def seed_demo():
     ]
     for s in shopping:
         await db.shopping.insert_one({**s, "id": str(uuid.uuid4()), "user_id": uid, "created_at": now_iso()})
+
+    budgets = [
+        {"category": "food", "monthly_cap": 350.0},
+        {"category": "groceries", "monthly_cap": 400.0},
+        {"category": "shopping", "monthly_cap": 200.0},
+        {"category": "transport", "monthly_cap": 150.0},
+    ]
+    for bg in budgets:
+        await db.budgets.insert_one({**bg, "id": str(uuid.uuid4()), "user_id": uid, "created_at": now_iso()})
 
     logger.info(f"Seeded demo user {DEMO_EMAIL}")
 
