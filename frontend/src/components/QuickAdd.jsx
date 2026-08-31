@@ -53,7 +53,7 @@ export default function QuickAdd({ open, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center" data-testid="quick-add-dialog">
       <div className="absolute inset-0 bg-black/60" onClick={() => onClose(false)} />
-      <div className="relative w-full max-w-lg card rise" style={{ borderRadius: "18px 18px 0 0", borderRadius: "18px" }}>
+      <div className="relative w-full max-w-lg card rise" style={{ borderRadius: "18px" }}>
         <div className="flex items-center justify-between px-5 pt-5 pb-4">
           <div>
             <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500">Quick add</div>

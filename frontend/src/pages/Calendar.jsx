@@ -15,7 +15,8 @@ const monthMatrix = (year, month) => {
 };
 
 const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
-const fmtTime = (d) => new Date(d).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+const fmtTime = (d) =>
+  new Date(d).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
 export default function Calendar() {
   const today = new Date();
@@ -29,11 +30,19 @@ export default function Calendar() {
     const pad = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
   };
-  useEffect(() => { setForm((f) => ({ ...f, starts_at: selectedForInput(selected) })); }, [selected]);
+  useEffect(() => {
+    setForm((f) => ({ ...f, starts_at: selectedForInput(selected) }));
+  }, [selected]);
 
   const load = async () => {
-    const [a, t] = await Promise.all([api.get("/appointments"), api.get("/tasks")]);
-    setAppts(a.data); setTasks(t.data);
+    try {
+      const [a, t] = await Promise.all([api.get("/appointments"), api.get("/tasks")]);
+      setAppts(a.data || []);
+      setTasks(t.data || []);
+    } catch (err) {
+      console.error("Failed to load appointments and tasks:", err);
+      toast.error("Unable to load calendar events");
+    }
   };
   useEffect(() => {
     load();
@@ -56,33 +65,80 @@ export default function Calendar() {
   const addAppt = async (e) => {
     e.preventDefault();
     if (!form.title || !form.starts_at) return;
-    await api.post("/appointments", form);
-    setForm({ title: "", location: "", starts_at: selectedForInput(selected), notes: "" });
-    toast.success("Appointment added");
-    load();
+    try {
+      await api.post("/appointments", form);
+      setForm({ title: "", location: "", starts_at: selectedForInput(selected), notes: "" });
+      toast.success("Appointment added");
+      load();
+    } catch (err) {
+      console.error("Failed to add appointment:", err);
+      toast.error(err.response?.data?.error || "Could not add appointment");
+    }
   };
-  const removeAppt = async (id) => { await api.delete(`/appointments/${id}`); load(); };
+
+  const removeAppt = async (id) => {
+    try {
+      await api.delete(`/appointments/${id}`);
+      toast.success("Appointment removed");
+      load();
+    } catch (err) {
+      console.error("Failed to delete appointment:", err);
+      toast.error("Could not remove appointment");
+    }
+  };
 
   return (
     <div className="p-5 md:p-8 max-w-[1200px] mx-auto" data-testid="calendar-page">
       <div className="mb-6">
-        <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500">Calendar</div>
-        <h1 className="font-display text-3xl md:text-4xl font-bold mt-2">{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500">
+          Calendar
+        </div>
+        <h1 className="font-display text-3xl md:text-4xl font-bold mt-2">
+          {cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        </h1>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-5">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-1">
-              <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))} className="btn btn-ghost !p-2" data-testid="cal-prev"><ChevronLeft size={16} /></button>
-              <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))} className="btn btn-ghost !p-2" data-testid="cal-next"><ChevronRight size={16} /></button>
-              <button onClick={() => { setCursor(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today); }} className="btn btn-ghost !py-1.5 !px-3 text-[12px]">Today</button>
+              <button
+                onClick={() =>
+                  setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
+                }
+                className="btn btn-ghost !p-2"
+                data-testid="cal-prev"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() =>
+                  setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
+                }
+                className="btn btn-ghost !p-2"
+                data-testid="cal-next"
+              >
+                <ChevronRight size={16} />
+              </button>
+              <button
+                onClick={() => {
+                  setCursor(new Date(today.getFullYear(), today.getMonth(), 1));
+                  setSelected(today);
+                }}
+                className="btn btn-ghost !py-1.5 !px-3 text-[12px]"
+              >
+                Today
+              </button>
             </div>
             <div className="text-[11px] text-slate-500 font-mono">MON – SUN</div>
           </div>
 
           <div className="grid grid-cols-7 text-[10px] text-slate-500 font-mono mb-2">
-            {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => <div key={d} className="py-1.5">{d}</div>)}
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <div key={d} className="py-1.5">
+                {d}
+              </div>
+            ))}
           </div>
           <div className="grid grid-cols-7 gap-1.5" data-testid="calendar-grid">
             {grid.map((day, i) => {
@@ -97,15 +153,21 @@ export default function Calendar() {
                   onClick={() => setSelected(day)}
                   data-testid={`cal-day-${day.getDate()}`}
                   className={`aspect-square rounded-lg text-left p-2 flex flex-col border transition-colors ${
-                    isSel ? "border-indigo-500 bg-indigo-500/10" : "border-transparent hover:border-slate-700"
-                  }`}
+                    isSel
+                      ? "border-indigo-500 bg-indigo-500/10"
+                      : "border-transparent hover:border-slate-700"
+                  } ${isToday ? "font-bold text-indigo-400" : "text-slate-200"}`}
                 >
-                  <span className={`text-[12px] font-medium ${isToday ? "text-indigo-300" : "text-slate-300"}`}>{day.getDate()}</span>
+                  <span className="text-xs">{day.getDate()}</span>
                   {total > 0 && (
-                    <span className="mt-auto flex gap-1">
-                      {ev.appts.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
-                      {ev.tasks.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                    </span>
+                    <div className="mt-auto flex gap-1">
+                      {ev.appts.length > 0 && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                      )}
+                      {ev.tasks.length > 0 && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      )}
+                    </div>
                   )}
                 </button>
               );
@@ -114,47 +176,74 @@ export default function Calendar() {
         </div>
 
         <div className="space-y-5">
-          <div className="card p-5" data-testid="day-detail">
-            <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500">Selected day</div>
-            <div className="font-display font-bold text-xl mt-1">
-              {selected.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-            </div>
+          <form onSubmit={addAppt} className="card p-5 space-y-3" data-testid="add-appt-form">
+            <div className="font-display font-bold text-sm">Add Appointment</div>
+            <input
+              className="input"
+              placeholder="Title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+            <input
+              type="datetime-local"
+              className="input"
+              value={form.starts_at}
+              onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+            />
+            <input
+              className="input"
+              placeholder="Location (optional)"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
+            <button type="submit" className="btn btn-primary w-full justify-center">
+              <Plus size={14} /> Schedule
+            </button>
+          </form>
 
-            <div className="mt-4 space-y-2">
-              {dayEvents.appts.length === 0 && dayEvents.tasks.length === 0 && (
-                <div className="text-sm text-slate-500">Nothing scheduled.</div>
-              )}
+          <div className="card p-5" data-testid="selected-day-events">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500 mb-3">
+              {selected.toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
+            </div>
+            {dayEvents.appts.length === 0 && dayEvents.tasks.length === 0 && (
+              <div className="text-sm text-slate-500 py-4 text-center">Nothing scheduled.</div>
+            )}
+            <div className="space-y-2">
               {dayEvents.appts.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg border" style={{ borderColor: "var(--border)" }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-indigo-500/15 text-indigo-300"><Clock size={14} /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium truncate">{a.title}</div>
-                    <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                      {fmtTime(a.starts_at)}{a.location && (<><MapPin size={10} /> {a.location}</>)}
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-slate-900/40 text-xs"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <div>
+                    <div className="font-medium text-slate-200">{a.title}</div>
+                    <div className="text-slate-500 flex items-center gap-1 mt-0.5">
+                      <Clock size={11} /> {fmtTime(a.starts_at)} {a.location && `· ${a.location}`}
                     </div>
                   </div>
-                  <button onClick={() => removeAppt(a.id)} className="text-slate-500 hover:text-red-300 p-1.5"><Trash2 size={14} /></button>
+                  <button
+                    onClick={() => removeAppt(a.id)}
+                    className="text-slate-500 hover:text-red-400 p-1"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               ))}
               {dayEvents.tasks.map((t) => (
-                <div key={t.id} className="flex items-center gap-3 p-3 rounded-lg border" style={{ borderColor: "var(--border)" }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-emerald-500/15 text-emerald-300 text-[10px] font-mono uppercase">Task</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium truncate">{t.title}</div>
-                    <div className="text-[11px] text-slate-500">Due · {t.priority} priority</div>
-                  </div>
+                <div
+                  key={t.id}
+                  className="p-3 rounded-lg border bg-slate-900/20 text-xs text-slate-400"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <span className="text-emerald-400 mr-2">✓ Task:</span> {t.title}
                 </div>
               ))}
             </div>
           </div>
-
-          <form onSubmit={addAppt} className="card p-5 space-y-3" data-testid="add-appt-form">
-            <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500">Add appointment</div>
-            <input className="input" placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <input className="input" placeholder="Location (optional)" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-            <input type="datetime-local" className="input" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
-            <button type="submit" className="btn btn-primary w-full justify-center"><Plus size={14} /> Add</button>
-          </form>
         </div>
       </div>
     </div>
