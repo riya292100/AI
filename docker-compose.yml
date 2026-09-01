@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: lifeos-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=lifeos_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lifeos-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=lifeos_db
+      - JWT_SECRET=lifeos_secret_key_production_ready_change_me
+      - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-demo@lifeos.app}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-lifeos123}
+      - FRONTEND_URL=http://localhost:3000
+      - CORS_ORIGINS=*
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: lifeos-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+    driver: local
