@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE20: "true"
+
 jobs:
   backend-test:
     name: Backend Lint & Tests
@@ -31,7 +34,9 @@ jobs:
 
       - name: Run Backend Pytest Suite
         run: |
-          pytest backend/tests -v --cov=backend
+          python -m pytest backend/tests -c backend/pytest.ini -v --cov=backend
+        env:
+          PYTHONPATH: .
 
   frontend-build:
     name: Frontend Lint, Test & Build
