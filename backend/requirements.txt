@@ -19,5 +19,5 @@ pytest-asyncio==0.23.5
 pytest-cov==4.1.0
 pytest-xdist>=3.5.0
 mongomock==4.1.2
-mongomock-motor==0.0.28
+mongomock-motor==0.0.36
 tzdata>=2024.1
