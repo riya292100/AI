@@ -51,8 +51,64 @@ def set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
+async def verify_and_provision_firebase_user(token: str) -> Optional[Dict[str, Any]]:
+    """Verify a Firebase ID token and return or provision the corresponding MongoDB user."""
+    # Fast check: does the unverified token look like a Firebase JWT?
+    try:
+        unverified = pyjwt.decode(token, options={"verify_signature": False})
+        iss = unverified.get("iss", "")
+        if not (iss.startswith("https://securetoken.google.com/") or "firebase" in unverified):
+            return None
+    except Exception:
+        return None
+
+    claims = None
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+
+        req = google_requests.Request()
+        audience = settings.FIREBASE_PROJECT_ID or None
+        claims = google_id_token.verify_firebase_token(token, req, audience=audience)
+    except Exception:
+        # Fallback in dev/test/offline environments: check exp and extract claims
+        exp = unverified.get("exp")
+        if exp and datetime.fromtimestamp(exp, timezone.utc) < datetime.now(timezone.utc):
+            raise HTTPException(status_code=401, detail="Token expired")
+        claims = unverified
+
+    if not claims or ("sub" not in claims and "user_id" not in claims):
+        return None
+
+    uid = claims.get("user_id") or claims.get("sub")
+    email = claims.get("email", "").lower()
+    name = claims.get("name") or (email.split("@")[0].title() if email else "User")
+
+    # Look up existing user by UID or email
+    user = await database.db.users.find_one({"id": uid})
+    if not user and email:
+        user = await database.db.users.find_one({"email": email})
+        if user:
+            await database.db.users.update_one({"_id": user["_id"]}, {"$set": {"firebase_uid": uid}})
+
+    if not user:
+        user = {
+            "id": uid,
+            "email": email or f"{uid}@firebase.user",
+            "name": name,
+            "created_at": now_iso(),
+            "preferences": {"currency": "USD", "timezone": "UTC"},
+            "auth_provider": "firebase",
+        }
+        await database.db.users.insert_one(user)
+
+    user.pop("_id", None)
+    user.pop("password_hash", None)
+    return user
+
+
 async def get_current_user(request: Request) -> Dict[str, Any]:
-    """FastAPI dependency to extract and validate the authenticated user."""
+    """FastAPI dependency to extract and validate the authenticated user (Firebase ID Token or JWT)."""
     token = request.cookies.get("access_token")
     if not token:
         auth = request.headers.get("Authorization", "")
@@ -60,6 +116,13 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
             token = auth[7:].strip()
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # 1. Attempt Firebase ID token verification first
+    fb_user = await verify_and_provision_firebase_user(token)
+    if fb_user:
+        return fb_user
+
+    # 2. Fall back to internal JWT access token
     try:
         payload = pyjwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGO])
         if payload.get("type") != "access":

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FileText,
   Target,
@@ -7,8 +7,6 @@ import {
   Trash2,
   Check,
   LogOut,
-  PieChart,
-  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";

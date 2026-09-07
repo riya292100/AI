@@ -116,6 +116,36 @@ api.include_router(ai.router)
 
 app.include_router(api)
 
+# Production SPA and static files serving (for Cloud Run / unified containers)
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+build_dir = Path(__file__).resolve().parent.parent / "frontend" / "build"
+if build_dir.exists():
+    static_dir = build_dir / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    @app.get("/")
+    async def serve_root():
+        index_file = build_dir / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        return {"app": "LifeOS API", "status": "ok"}
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api"):
+            raise StarletteHTTPException(status_code=404, detail="API endpoint not found")
+        file_path = build_dir / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        index_file = build_dir / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        raise StarletteHTTPException(status_code=404, detail="Resource not found")
+
 if __name__ == "__main__":
     import uvicorn
 

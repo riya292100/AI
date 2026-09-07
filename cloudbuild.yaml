@@ -1,0 +1,25 @@
+steps:
+  # Build the unified container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/lifeos:$COMMIT_SHA', '-t', 'gcr.io/$PROJECT_ID/lifeos:latest', '.']
+
+  # Push image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/lifeos:latest']
+
+  # Deploy to Google Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'lifeos'
+      - '--image=gcr.io/$PROJECT_ID/lifeos:latest'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=CORS_ORIGINS=*'
+
+images:
+  - 'gcr.io/$PROJECT_ID/lifeos:latest'
+  - 'gcr.io/$PROJECT_ID/lifeos:$COMMIT_SHA'

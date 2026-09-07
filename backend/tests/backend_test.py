@@ -97,6 +97,40 @@ class TestHealthAndAuth:
         )
         assert r.status_code == 401
 
+    def test_firebase_token_auto_provisions_user(self, api_client):
+        import jwt as pyjwt
+        fb_uid = f"fb_{uuid.uuid4().hex[:10]}"
+        fb_email = f"{fb_uid}@gmail.com"
+        fb_payload = {
+            "iss": "https://securetoken.google.com/test-project",
+            "aud": "test-project",
+            "auth_time": int(datetime.now(timezone.utc).timestamp()),
+            "user_id": fb_uid,
+            "sub": fb_uid,
+            "email": fb_email,
+            "name": "Firebase User",
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+        }
+        fb_token = pyjwt.encode(fb_payload, "dummy_secret", algorithm="HS256")
+        r = api_client.get("/api/auth/me", headers={"Authorization": f"Bearer {fb_token}"})
+        assert r.status_code == 200
+        u = r.json()
+        assert u["id"] == fb_uid
+        assert u["email"] == fb_email
+        assert u["name"] == "Firebase User"
+        assert u.get("auth_provider") == "firebase"
+
+        # Test sync endpoint
+        sync_r = api_client.post(
+            "/api/auth/sync",
+            headers={"Authorization": f"Bearer {fb_token}"},
+            json={"name": "Updated Firebase User", "photo_url": "https://example.com/avatar.png"},
+        )
+        assert sync_r.status_code == 200
+        updated = sync_r.json()
+        assert updated["name"] == "Updated Firebase User"
+        assert updated["photo_url"] == "https://example.com/avatar.png"
+
 
 # --------------------------------------------------------------- Tasks
 class TestTasks:

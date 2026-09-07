@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Wallet, Plus, Trash2, Check, Receipt } from "lucide-react";
+import { Plus, Trash2, Check } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";
 
@@ -87,7 +87,6 @@ export default function Money() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6);
   }, [expenses]);
-  const catMax = Math.max(1, ...byCategory.map(([, v]) => v));
 
   const addBill = async (e) => {
     e.preventDefault();

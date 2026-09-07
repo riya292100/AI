@@ -13,6 +13,7 @@ class Settings:
     DB_NAME: str = os.environ.get("DB_NAME", "lifeos_db")
     JWT_SECRET: str = os.environ.get("JWT_SECRET", "lifeos_dev_secret_key_change_in_production")
     JWT_ALGO: str = "HS256"
+    FIREBASE_PROJECT_ID: str = os.environ.get("FIREBASE_PROJECT_ID", "")
     EMERGENT_LLM_KEY: str = os.environ.get("EMERGENT_LLM_KEY", "")
     ADMIN_EMAIL: str = os.environ.get("ADMIN_EMAIL", "demo@lifeos.app")
     ADMIN_PASSWORD: str = os.environ.get("ADMIN_PASSWORD", "lifeos123")

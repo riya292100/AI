@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, MapPin, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";
 

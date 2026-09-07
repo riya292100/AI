@@ -73,3 +73,21 @@ async def logout(response: Response):
 async def me(user=Depends(get_current_user)):
     """Get the currently authenticated user's profile."""
     return user
+
+
+@router.post("/sync")
+async def sync_profile(request: Request, user=Depends(get_current_user)):
+    """Sync and update user details from client or Firebase."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    updates = {}
+    if body.get("name"):
+        updates["name"] = body["name"]
+    if body.get("photo_url"):
+        updates["photo_url"] = body["photo_url"]
+    if updates:
+        await database.db.users.update_one({"id": user["id"]}, {"$set": updates})
+        user.update(updates)
+    return user

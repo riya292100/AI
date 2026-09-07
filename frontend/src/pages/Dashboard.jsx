@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Clock,
   TrendingUp,
-  AlertTriangle,
   Check,
 } from "lucide-react";
 import { toast } from "sonner";

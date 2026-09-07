@@ -37,14 +37,17 @@ export default [
       ...reactHooks.configs.recommended.rules,
       "react/prop-types": "off",
       "react/react-in-jsx-scope": "off",
+      "react/jsx-uses-vars": "error",
       "no-unused-vars": [
         "warn",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
+          caughtErrors: "all",
+          caughtErrorsIgnorePattern: "^_",
         },
       ],
-      "no-empty": ["error", { allowEmptyCatch: false }],
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 ];

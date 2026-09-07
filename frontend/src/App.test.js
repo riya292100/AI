@@ -1,4 +1,4 @@
-import React, { act } from "react";
+import { act } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import api from "./lib/api";

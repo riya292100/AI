@@ -1,4 +1,4 @@
-import React, { act } from "react";
+import { act } from "react";
 import ReactDOM from "react-dom/client";
 import ErrorBoundary from "./ErrorBoundary";
 
