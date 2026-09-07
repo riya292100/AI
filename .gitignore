@@ -78,8 +78,11 @@ agenthub/agents/youtube/db
 *.deb
 *.dylib
 
-# Build caches
+# Build caches and test reports
 .cache/
+test_reports/
+.emergent/
+/yarn.lock
 
 memory/test_credentials.md
 
