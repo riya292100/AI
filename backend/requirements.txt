@@ -21,4 +21,3 @@ pytest-xdist>=3.5.0
 mongomock==4.1.2
 mongomock-motor==0.0.28
 tzdata>=2024.1
-emergentintegrations==0.2.0
