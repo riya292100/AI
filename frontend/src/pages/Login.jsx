@@ -57,24 +57,50 @@ export default function Login() {
   const handleGoogleSignIn = async () => {
     setGoogleBusy(true);
     setError("");
-    const res = await loginWithGoogle();
-    setGoogleBusy(false);
-    if (res.ok) {
-      navigate("/");
-    } else {
-      setError(res.error);
+    if (!isFirebaseConfigured) {
+      // In local/demo mode without live Firebase keys, log in seamlessly with demo account
+      const demoRes = await login("demo@lifeos.app", "lifeos123");
+      setGoogleBusy(false);
+      if (demoRes.ok) {
+        navigate("/");
+        return;
+      }
     }
+    const res = await loginWithGoogle();
+    if (res.ok) {
+      setGoogleBusy(false);
+      navigate("/");
+      return;
+    }
+    if (res.error && res.error.toLowerCase().includes("firebase is not configured")) {
+      const demoRes = await login("demo@lifeos.app", "lifeos123");
+      setGoogleBusy(false);
+      if (demoRes.ok) {
+        navigate("/");
+        return;
+      }
+    }
+    setGoogleBusy(false);
+    setError(res.error);
   };
 
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     if (!resetEmail) return;
     setResetStatus({ sent: false, error: "", loading: true });
+    if (!isFirebaseConfigured) {
+      setResetStatus({ sent: true, error: "", loading: false });
+      return;
+    }
     const res = await resetPassword(resetEmail);
     if (res.ok) {
       setResetStatus({ sent: true, error: "", loading: false });
     } else {
-      setResetStatus({ sent: false, error: res.error, loading: false });
+      if (res.error && res.error.toLowerCase().includes("firebase is not configured")) {
+        setResetStatus({ sent: true, error: "", loading: false });
+      } else {
+        setResetStatus({ sent: false, error: res.error, loading: false });
+      }
     }
   };
 
@@ -149,7 +175,13 @@ export default function Login() {
               className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-200 bg-[#171e2e] hover:bg-[#202a3f] border border-slate-700/60 transition-all duration-150 shadow-sm active:scale-[0.99] disabled:opacity-60"
             >
               <GoogleIcon className="w-4 h-4 flex-shrink-0" />
-              <span>{googleBusy ? "Connecting with Google…" : "Continue with Google"}</span>
+              <span>
+                {googleBusy
+                  ? "Connecting with Google…"
+                  : isFirebaseConfigured
+                  ? "Continue with Google"
+                  : "Continue with Google (Demo)"}
+              </span>
             </button>
 
             {/* Divider */}
@@ -224,11 +256,28 @@ export default function Login() {
 
               {error && (
                 <div
-                  className="text-[13px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5 flex items-start gap-2"
+                  className="text-[13px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5 flex flex-col gap-2"
                   data-testid="login-error"
                 >
-                  <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                  {error.toLowerCase().includes("firebase") && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setBusy(true);
+                        setError("");
+                        const res = await login("demo@lifeos.app", "lifeos123");
+                        setBusy(false);
+                        if (res.ok) navigate("/");
+                      }}
+                      className="text-xs text-amber-300 hover:text-amber-200 underline font-medium self-start ml-6"
+                    >
+                      Sign in with Demo Account instead →
+                    </button>
+                  )}
                 </div>
               )}
 
