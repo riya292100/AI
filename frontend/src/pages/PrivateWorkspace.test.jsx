@@ -70,7 +70,30 @@ describe("PrivateWorkspace Page", () => {
     expect(container.querySelector('[data-testid="login-card-title"]').textContent).toBe("Enter your workspace");
   });
 
-  test("renders hardened dashboard when user session exists", async () => {
+  test("clicking demo login button calls demo-login API", async () => {
+    apiModule.apiGet.mockImplementation((url) => {
+      if (url === "/auth/session") return Promise.resolve(null);
+      return Promise.resolve([]);
+    });
+    apiModule.apiPost.mockResolvedValue({ token: "fake-jwt", user: { id: "u1" } });
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <PrivateWorkspace />
+        </QueryClientProvider>
+      );
+    });
+
+    const loginBtn = container.querySelector('[data-testid="auth-demo-login-button"]');
+    await act(async () => {
+      loginBtn.click();
+    });
+
+    expect(apiModule.apiPost).toHaveBeenCalledWith("/auth/demo-login", {});
+  });
+
+  test("renders hardened dashboard and supports task, AI, and document interactions", async () => {
     apiModule.apiGet.mockImplementation((url) => {
       if (url === "/auth/session") {
         return Promise.resolve({
@@ -124,6 +147,8 @@ describe("PrivateWorkspace Page", () => {
       }
       return Promise.resolve(null);
     });
+    apiModule.apiPost.mockResolvedValue({ id: "t2", title: "New created task" });
+    apiModule.apiPatch.mockResolvedValue({ id: "t1", completed: true });
 
     await act(async () => {
       root.render(
@@ -156,5 +181,53 @@ describe("PrivateWorkspace Page", () => {
     expect(container.querySelector('[data-testid="daily-review-card"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="ai-assistant-card"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="document-upload-card"]')).not.toBeNull();
+
+    // Task toggle action
+    const taskCheckbox = container.querySelector('[data-testid="task-item-checkbox-t1"]');
+    expect(taskCheckbox).not.toBeNull();
+    await act(async () => {
+      taskCheckbox.click();
+    });
+    expect(apiModule.apiPatch).toHaveBeenCalledWith("/tasks/t1", { completed: true, version: 1 });
+
+    function setNativeValue(element, value) {
+      const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      valueSetter.call(element, value);
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // Task add action
+    const taskInput = container.querySelector('[data-testid="task-title-input"]');
+    const taskForm = container.querySelector('[data-testid="task-create-form"]');
+    await act(async () => {
+      setNativeValue(taskInput, "New created task");
+    });
+    await act(async () => {
+      taskForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(apiModule.apiPost).toHaveBeenCalledWith("/tasks", {
+      title: "New created task",
+      priority: "medium",
+      due_date: null,
+    });
+
+    // AI prompt action
+    const aiInput = container.querySelector('[data-testid="ai-prompt-input"]');
+    const aiSendBtn = container.querySelector('[data-testid="ai-send-button"]');
+    await act(async () => {
+      setNativeValue(aiInput, "How to plan today?");
+    });
+    await act(async () => {
+      aiSendBtn.click();
+    });
+    expect(container.querySelector('[data-testid="ai-mocked-status"]')).not.toBeNull();
+
+    // Document dropzone action
+    const docInput = container.querySelector('[data-testid="document-file-input"]');
+    await act(async () => {
+      docInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector('[data-testid="document-mocked-status"]')).not.toBeNull();
   });
 });
