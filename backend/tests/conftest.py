@@ -37,7 +37,7 @@ def api_client(mock_db):
 def test_user(mock_db, api_client):
     """Create a fresh throwaway test user and return credentials + token."""
     email = f"test_{uuid.uuid4().hex[:8]}@example.com"
-    password = "Password123!"
+    password = os.environ.get("TEST_USER_PASSWORD", "Test_Fixture_Pass_123!")
     r = api_client.post(
         "/api/auth/register",
         json={"email": email, "password": password, "name": "Test User"},
