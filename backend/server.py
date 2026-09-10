@@ -25,6 +25,7 @@ from backend.routers import (
     reminders,
     dashboard,
     ai,
+    workspace,
 )
 
 
@@ -113,6 +114,7 @@ api.include_router(budgets.router)
 api.include_router(reminders.router)
 api.include_router(dashboard.router)
 api.include_router(ai.router)
+api.include_router(workspace.router)
 
 app.include_router(api)
 

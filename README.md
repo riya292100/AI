@@ -14,6 +14,7 @@
 
 ## 🌟 Key Features
 
+- **🛡️ Hardened Private Workspace (`/workspace`)**: High-density emerald & obsidian command dashboard with one-click sandbox session auth, optimistic concurrency control (`version`), paginated tasks, live KPI cards, scoped assistant, and daily reviews.
 - **📊 Central Intelligence Dashboard**: Consolidated overview of daily KPIs, urgent items, upcoming commitments, and instant AI daily planning.
 - **🤖 AI Life Assistant**: Real-time streaming conversational assistant grounded in your personal tasks, bills, and schedule with automatic local fallback.
 - **🔐 Hybrid Authentication (Firebase + JWT)**: Support for **Google Sign-In** and **Firebase Email/Password** with backend ID token verification, automatic tenant user provisioning, plus internal JWT HttpOnly cookie fallback.
@@ -53,8 +54,9 @@ LifeOS/
 │   │   ├── budgets.py        # Monthly budget caps & calculations
 │   │   ├── reminders.py      # Proactive computed alerts & dismissal
 │   │   ├── dashboard.py      # KPI metrics & global search
+│   │   ├── workspace.py      # Hardened Private Workspace items & daily reviews
 │   │   ├── ai.py             # Streaming chat & daily planner
-│   │   └── health.py         # Health checks
+│   │   └── health.py         # Health checks (Mongo source of truth)
 │   ├── tests/                # Self-contained in-memory test suite
 │   │   ├── conftest.py       # Pytest fixtures (mongomock, TestClient, test user)
 │   │   └── backend_test.py   # Full API regression suite
@@ -104,6 +106,20 @@ docker compose up --build
 **Default Demo Credentials**:
 - **Email**: `demo@lifeos.app`
 - **Password**: `lifeos123`
+
+---
+
+## 🛡️ Hardened Private Workspace (`/workspace`)
+
+The **Hardened Private Workspace** is an obsidian and emerald control center designed for security-first executive workflows:
+
+- **🔐 Session & Sandbox Auth**: Supports both live Firebase sessions and one-click demo sandbox sessions (`POST /api/auth/demo-login`) with HttpOnly cookie handling and `GET /api/auth/session` verification.
+- **⚡ Optimistic Concurrency Control**: All workspace items and task updates leverage atomic version checking (`version: number`) to prevent stale overwrites across concurrent sessions.
+- **📈 Paginated Task Engine**: Tasks endpoint supports high-efficiency cursor/offset querying (`GET /api/tasks?limit={limit}&offset={offset}`) alongside backwards-compatible array returns.
+- **📑 Multi-Category Workspace Items**: Create, complete, filter, and delete personal directives across `ACTION`, `PROJECT`, `DOC`, and `NOTE` categories (`/api/workspace/items`).
+- **🌅 Structured Daily Reviews**: Run instant morning directives checks and night retrospectives (`GET /api/review/today`) summarizing pending vs completed directives.
+- **🤖 Scoped Assistant**: Dedicated on-screen assistant providing quick contextual responses directly within the hardened viewport.
+- **🔍 Mongo-Backed Source of Truth**: Full live database synchronization with verified status in `/api/health` (`mongo_source_of_truth: true`).
 
 ---
 

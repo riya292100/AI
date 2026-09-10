@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Hexagon, Sparkles, ArrowRight, Eye, EyeOff, CheckCircle2, AlertCircle } from "lucide-react";
+import { Hexagon, Sparkles, ArrowRight, Eye, EyeOff, CheckCircle2, AlertCircle, ScanLine } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 function GoogleIcon({ className = "w-4 h-4" }) {
@@ -257,6 +257,17 @@ export default function Login() {
               data-testid="go-to-register"
             >
               Create an account
+            </Link>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-800 text-center">
+            <Link
+              to="/workspace"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-xs font-medium transition-colors"
+              data-testid="go-to-private-workspace"
+            >
+              <ScanLine size={15} />
+              <span>Explore Hardened Private Workspace (Demo)</span>
             </Link>
           </div>
 

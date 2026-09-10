@@ -1,4 +1,5 @@
 """Authentication and authorization utilities for LifeOS."""
+import os
 import bcrypt
 import jwt as pyjwt
 from datetime import datetime, timezone, timedelta
@@ -40,12 +41,16 @@ def create_access_token(user_id: str, email: str, days: int = 7) -> str:
 
 def set_auth_cookie(response: Response, token: str) -> None:
     """Set the HttpOnly access_token cookie."""
+    is_secure = (
+        os.environ.get("COOKIE_SECURE", "").lower() == "true"
+        or settings.FRONTEND_URL.startswith("https")
+    )
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=is_secure,
+        samesite="none" if is_secure else "lax",
         max_age=7 * 24 * 60 * 60,
         path="/",
     )
@@ -137,6 +142,15 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Token expired")
     except pyjwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_optional_current_user(request: Request) -> Optional[Dict[str, Any]]:
+    """FastAPI dependency that returns user if authenticated, or None if not."""
+    try:
+        return await get_current_user(request)
+    except HTTPException:
+        return None
+
 
 
 LOCK_MAX_ATTEMPTS = 5

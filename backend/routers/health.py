@@ -13,4 +13,9 @@ async def root():
 @router.get("/health")
 async def health():
     """Detailed health check endpoint."""
-    return {"status": "healthy", "service": "LifeOS API"}
+    return {
+        "status": "healthy",
+        "service": "LifeOS API",
+        "mongo_source_of_truth": True,
+    }
+

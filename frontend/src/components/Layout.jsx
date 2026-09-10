@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ListChecks, Wallet, CalendarDays, Sparkles, Menu, LogOut, Search, Plus, Hexagon } from "lucide-react";
+import { LayoutDashboard, ListChecks, Wallet, CalendarDays, Sparkles, Menu, LogOut, Search, Plus, Hexagon, ScanLine } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import QuickAdd from "./QuickAdd";
@@ -7,6 +7,7 @@ import GlobalSearch from "./GlobalSearch";
 
 const nav = [
   { to: "/", label: "Home", icon: LayoutDashboard, testid: "nav-home" },
+  { to: "/workspace", label: "Workspace", icon: ScanLine, testid: "nav-workspace", badge: "HARDENED" },
   { to: "/tasks", label: "Tasks", icon: ListChecks, testid: "nav-tasks" },
   { to: "/calendar", label: "Calendar", icon: CalendarDays, testid: "nav-calendar" },
   { to: "/money", label: "Money", icon: Wallet, testid: "nav-money" },
@@ -28,7 +29,7 @@ const Sidebar = ({ user, onLogout }) => (
     </div>
 
     <nav className="px-3 flex flex-col gap-1">
-      {nav.map(({ to, label, icon: Icon, testid }) => (
+      {nav.map(({ to, label, icon: Icon, testid, badge }) => (
         <NavLink
           key={to}
           to={to}
@@ -43,7 +44,12 @@ const Sidebar = ({ user, onLogout }) => (
           }
         >
           <Icon size={16} />
-          {label}
+          <span className="flex-1 truncate">{label}</span>
+          {badge && (
+            <span className="font-mono text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-400/10 text-emerald-300 border border-emerald-400/20">
+              {badge}
+            </span>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -58,20 +64,20 @@ const Sidebar = ({ user, onLogout }) => (
           />
         ) : (
           <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm" style={{ background: "#293449" }}>
-            {(user?.name || user?.email || "?").slice(0, 1).toUpperCase()}
+            {user?.name?.[0] || user?.email?.[0] || "U"}
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold truncate">{user?.name || "You"}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold truncate">{user?.name || "LifeOS User"}</div>
           <div className="text-[11px] text-slate-500 truncate">{user?.email}</div>
         </div>
         <button
-          className="text-slate-500 hover:text-white p-1.5 rounded-md hover:bg-white/5"
           onClick={onLogout}
+          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"
+          title="Sign out"
           data-testid="logout-button"
-          title="Log out"
         >
-          <LogOut size={15} />
+          <LogOut size={16} />
         </button>
       </div>
     </div>
@@ -84,7 +90,7 @@ const BottomNav = () => (
     style={{ background: "rgba(14,19,31,0.95)", borderColor: "var(--border)", backdropFilter: "blur(12px)" }}
     data-testid="bottom-nav"
   >
-    <div className="grid grid-cols-6">
+    <div className="grid grid-cols-7">
       {nav.map(({ to, label, icon: Icon, testid }) => (
         <NavLink
           key={to}
@@ -92,13 +98,13 @@ const BottomNav = () => (
           end={to === "/"}
           data-testid={`${testid}-mobile`}
           className={({ isActive }) =>
-            `flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+            `flex flex-col items-center gap-1 py-2 text-[9px] font-medium transition-colors ${
               isActive ? "text-indigo-300" : "text-slate-500"
             }`
           }
         >
-          <Icon size={18} />
-          {label}
+          <Icon size={16} />
+          <span className="truncate max-w-[48px]">{label}</span>
         </NavLink>
       ))}
     </div>

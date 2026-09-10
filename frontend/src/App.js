@@ -12,6 +12,8 @@ import Money from "./pages/Money";
 import Calendar from "./pages/Calendar";
 import Assistant from "./pages/Assistant";
 import More from "./pages/More";
+import PrivateWorkspace from "./pages/PrivateWorkspace";
+
 
 const Protected = ({ children }) => {
   const { user, ready } = useAuth();
@@ -39,6 +41,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
       <Route path="/register" element={<RedirectIfAuthed><Register /></RedirectIfAuthed>} />
+      <Route path="/workspace" element={<PrivateWorkspace />} />
       <Route element={<Protected><Layout /></Protected>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/tasks" element={<Tasks />} />

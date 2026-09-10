@@ -37,4 +37,25 @@ export const formatApiErrorDetail = (detail) => {
   return String(detail);
 };
 
+export const apiGet = async (url, config) => {
+  const res = await api.get(url, config);
+  return res.data;
+};
+
+export const apiPost = async (url, data, config) => {
+  const res = await api.post(url, data, config);
+  return res.data;
+};
+
+export const apiPatch = async (url, data, config) => {
+  const res = await api.patch(url, data, config);
+  return res.data;
+};
+
+export const apiDelete = async (url, config) => {
+  const res = await api.delete(url, config);
+  return res.data;
+};
+
 export default api;
+

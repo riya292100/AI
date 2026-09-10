@@ -30,6 +30,10 @@ jest.mock("./lib/api", () => {
     default: mockApi,
     setAuthToken: jest.fn(),
     formatApiErrorDetail: (detail) => detail || "Error",
+    apiGet: jest.fn().mockResolvedValue(null),
+    apiPost: jest.fn().mockResolvedValue({}),
+    apiPatch: jest.fn().mockResolvedValue({}),
+    apiDelete: jest.fn().mockResolvedValue({}),
   };
 });
 

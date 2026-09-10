@@ -36,6 +36,7 @@ class TaskInput(BaseModel):
     category: str = "general"
     due_date: Optional[str] = None  # ISO date/datetime
     status: Literal["todo", "in_progress", "done"] = "todo"
+    completed: Optional[bool] = None
 
 
 class TaskUpdate(BaseModel):
@@ -45,6 +46,8 @@ class TaskUpdate(BaseModel):
     category: Optional[str] = None
     due_date: Optional[str] = None
     status: Optional[Literal["todo", "in_progress", "done"]] = None
+    completed: Optional[bool] = None
+    version: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -147,3 +150,51 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     request_id: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Workspace & Review (Hardened LifeOS)
+# ---------------------------------------------------------------------------
+WorkspaceCategory = Literal["finance", "calendar", "habit", "shopping", "reminder"]
+
+
+class WorkspaceItemInput(BaseModel):
+    category: WorkspaceCategory = "reminder"
+    title: str
+    note: Optional[str] = None
+    amount: Optional[float] = None
+    scheduled_for: Optional[str] = None
+
+
+class WorkspaceItemUpdate(BaseModel):
+    category: Optional[WorkspaceCategory] = None
+    title: Optional[str] = None
+    note: Optional[str] = None
+    amount: Optional[float] = None
+    scheduled_for: Optional[str] = None
+    status: Optional[Literal["open", "done"]] = None
+    version: Optional[int] = None
+
+
+class WorkspaceItemResponse(BaseModel):
+    id: str
+    owner_id: str
+    category: WorkspaceCategory
+    title: str
+    note: Optional[str] = None
+    amount: Optional[float] = None
+    scheduled_for: Optional[str] = None
+    status: Literal["open", "done"] = "open"
+    version: int = 1
+    created_at: str
+    updated_at: str
+
+
+class DailyReviewResponse(BaseModel):
+    date: str
+    open_tasks: int
+    open_modules: int
+    completed_tasks: int
+    next_actions: List[str]
+    generated_locally: bool = True
+

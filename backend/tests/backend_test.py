@@ -438,3 +438,119 @@ class TestAI:
         r = client.get("/api/ai/messages")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+
+# --------------------------------------------------------------- Hardened Private Workspace
+class TestPrivateWorkspace:
+    def test_health_has_mongo_source_of_truth(self, client):
+        r = client.get("/api/health")
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("mongo_source_of_truth") is True
+        assert data.get("status") == "healthy"
+
+    def test_session_unauthenticated_returns_none(self, api_client):
+        r = api_client.get("/api/auth/session")
+        assert r.status_code == 200
+        assert r.json() is None
+
+    def test_demo_login_and_session(self, api_client):
+        r = api_client.post("/api/auth/demo-login")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["email"] == "demo@lifeos.internal"
+        assert data["auth_mode"] == "MOCK"
+        assert "token" in data
+
+        token = data["token"]
+        # Verify session via cookie and via Bearer token
+        s_cookie = api_client.get("/api/auth/session", cookies={"access_token": token})
+        assert s_cookie.status_code == 200
+        sess = s_cookie.json()
+        assert sess is not None
+        assert sess["email"] == "demo@lifeos.internal"
+        assert sess["auth_mode"] == "MOCK"
+
+        s_bearer = api_client.get("/api/auth/session", headers={"Authorization": f"Bearer {token}"})
+        assert s_bearer.status_code == 200
+        assert s_bearer.json()["email"] == "demo@lifeos.internal"
+
+    def test_workspace_items_crud_and_locking(self, client):
+        # Create item
+        payload = {
+            "category": "reminder",
+            "title": "Review security boundary",
+            "note": "Verify isolation rules",
+        }
+        create_res = client.post("/api/workspace/items", json=payload)
+        assert create_res.status_code == 200
+        item = create_res.json()
+        assert item["title"] == "Review security boundary"
+        assert item["category"] == "reminder"
+        assert item["status"] == "open"
+        assert item["version"] == 1
+        item_id = item["id"]
+
+        # List items with pagination
+        list_res = client.get("/api/workspace/items?limit=10&offset=0")
+        assert list_res.status_code == 200
+        page = list_res.json()
+        assert "items" in page
+        assert page["total"] >= 1
+        assert any(i["id"] == item_id for i in page["items"])
+
+        # Patch item status with matching version
+        patch_res = client.patch(
+            f"/api/workspace/items/{item_id}",
+            json={"status": "done", "version": 1},
+        )
+        assert patch_res.status_code == 200
+        updated = patch_res.json()
+        assert updated["status"] == "done"
+        assert updated["version"] == 2
+
+        # Stale version patch should return 409
+        stale_res = client.patch(
+            f"/api/workspace/items/{item_id}",
+            json={"status": "open", "version": 1},
+        )
+        assert stale_res.status_code == 409
+
+        # Delete item
+        del_res = client.delete(f"/api/workspace/items/{item_id}")
+        assert del_res.status_code == 200
+
+    def test_daily_review_endpoint(self, client):
+        # Create a task and workspace item
+        client.post("/api/tasks", json={"title": "Daily Review Task", "priority": "high"})
+        client.post("/api/workspace/items", json={"category": "finance", "title": "Audit subscriptions"})
+
+        r = client.get("/api/review/today")
+        assert r.status_code == 200
+        data = r.json()
+        for k in ["date", "open_tasks", "open_modules", "completed_tasks", "next_actions", "generated_locally"]:
+            assert k in data, f"missing {k} in daily review"
+        assert data["generated_locally"] is True
+        assert len(data["next_actions"]) >= 1
+
+    def test_tasks_paginated_format_and_versioning(self, client):
+        created = client.post("/api/tasks", json={"title": "Hardened Task Line Item", "priority": "medium"}).json()
+        tid = created["id"]
+        assert created.get("completed") is False
+        assert created.get("version") == 1
+
+        # Query with limit returns { items, total, offset, limit }
+        page = client.get("/api/tasks?limit=20&offset=0").json()
+        assert isinstance(page, dict)
+        assert "items" in page
+        assert page["total"] >= 1
+
+        # Toggle completed
+        patched = client.patch(f"/api/tasks/{tid}", json={"completed": True, "version": 1}).json()
+        assert patched["completed"] is True
+        assert patched["status"] == "done"
+        assert patched["version"] == 2
+
+        # Delete
+        client.delete(f"/api/tasks/{tid}")
+
