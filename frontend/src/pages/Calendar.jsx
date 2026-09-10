@@ -1,89 +1,37 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2, Clock, ChevronLeft, ChevronRight } from "lucide-react";
-import { toast } from "sonner";
-import api from "../lib/api";
-
-const monthMatrix = (year, month) => {
-  const first = new Date(year, month, 1);
-  const startWeekday = (first.getDay() + 6) % 7; // Monday-first
-  const days = [];
-  for (let i = 0; i < startWeekday; i++) days.push(null);
-  const last = new Date(year, month + 1, 0).getDate();
-  for (let d = 1; d <= last; d++) days.push(new Date(year, month, d));
-  while (days.length % 7 !== 0) days.push(null);
-  return days;
-};
-
-const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
-const fmtTime = (d) =>
-  new Date(d).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+import { formatTime as fmtTime, isSameDay, toDatetimeLocal as selectedForInput } from "../lib/formatters";
+import { useCalendarData } from "../hooks/useCalendarData";
 
 export default function Calendar() {
   const today = new Date();
-  const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [appts, setAppts] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [selected, setSelected] = useState(today);
+  const {
+    cursor,
+    setCursor,
+    selected,
+    setSelected,
+    grid,
+    eventsFor,
+    selectedEvents: dayEvents,
+    prevMonth,
+    nextMonth,
+    goToToday,
+    addAppointment,
+    deleteAppointment: removeAppt,
+  } = useCalendarData();
+
   const [form, setForm] = useState({ title: "", location: "", starts_at: "", notes: "" });
 
-  const selectedForInput = (d) => {
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
-  };
   useEffect(() => {
     setForm((f) => ({ ...f, starts_at: selectedForInput(selected) }));
   }, [selected]);
 
-  const load = async () => {
-    try {
-      const [a, t] = await Promise.all([api.get("/appointments"), api.get("/tasks")]);
-      setAppts(a.data || []);
-      setTasks(t.data || []);
-    } catch (err) {
-      console.error("Failed to load appointments and tasks:", err);
-      toast.error("Unable to load calendar events");
-    }
-  };
-  useEffect(() => {
-    load();
-    const onR = () => load();
-    window.addEventListener("lifeos:refresh", onR);
-    return () => window.removeEventListener("lifeos:refresh", onR);
-  }, []);
-
-  const grid = useMemo(() => monthMatrix(cursor.getFullYear(), cursor.getMonth()), [cursor]);
-
-  const eventsFor = (day) => {
-    if (!day) return { appts: [], tasks: [] };
-    const a = appts.filter((x) => isSameDay(new Date(x.starts_at), day));
-    const t = tasks.filter((x) => x.due_date && isSameDay(new Date(x.due_date), day));
-    return { appts: a, tasks: t };
-  };
-
-  const dayEvents = eventsFor(selected);
-
   const addAppt = async (e) => {
     e.preventDefault();
     if (!form.title || !form.starts_at) return;
-    try {
-      await api.post("/appointments", form);
+    const ok = await addAppointment(form);
+    if (ok) {
       setForm({ title: "", location: "", starts_at: selectedForInput(selected), notes: "" });
-      toast.success("Appointment added");
-      load();
-    } catch (err) {
-      console.error("Failed to add appointment:", err);
-      toast.error(err.response?.data?.error || "Could not add appointment");
-    }
-  };
-
-  const removeAppt = async (id) => {
-    try {
-      await api.delete(`/appointments/${id}`);
-      toast.success("Appointment removed");
-      load();
-    } catch (err) {
-      console.error("Failed to delete appointment:", err);
-      toast.error("Could not remove appointment");
     }
   };
 
@@ -103,28 +51,21 @@ export default function Calendar() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-1">
               <button
-                onClick={() =>
-                  setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
-                }
+                onClick={prevMonth}
                 className="btn btn-ghost !p-2"
                 data-testid="cal-prev"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
-                onClick={() =>
-                  setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
-                }
+                onClick={nextMonth}
                 className="btn btn-ghost !p-2"
                 data-testid="cal-next"
               >
                 <ChevronRight size={16} />
               </button>
               <button
-                onClick={() => {
-                  setCursor(new Date(today.getFullYear(), today.getMonth(), 1));
-                  setSelected(today);
-                }}
+                onClick={goToToday}
                 className="btn btn-ghost !py-1.5 !px-3 text-[12px]"
               >
                 Today
@@ -183,20 +124,23 @@ export default function Calendar() {
               placeholder="Title"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
+              data-testid="appt-title-input"
             />
             <input
               type="datetime-local"
               className="input"
               value={form.starts_at}
               onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+              data-testid="appt-time-input"
             />
             <input
               className="input"
               placeholder="Location (optional)"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+              data-testid="appt-location-input"
             />
-            <button type="submit" className="btn btn-primary w-full justify-center">
+            <button type="submit" className="btn btn-primary w-full justify-center" data-testid="appt-submit">
               <Plus size={14} /> Schedule
             </button>
           </form>
@@ -227,6 +171,7 @@ export default function Calendar() {
                   </div>
                   <button
                     onClick={() => removeAppt(a.id)}
+                    data-testid={`delete-appt-${a.id}`}
                     className="text-slate-500 hover:text-red-400 p-1"
                   >
                     <Trash2 size={13} />

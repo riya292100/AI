@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Check, Plus, Trash2, Filter } from "lucide-react";
-import { toast } from "sonner";
-import api from "../lib/api";
+import { formatDate as fmt } from "../lib/formatters";
+import { useTasksData } from "../hooks/useTasksData";
 
 const priorityChip = (p) =>
   p === "high" ? "chip-danger" : p === "medium" ? "chip-warn" : "";
@@ -12,81 +12,24 @@ const statusOptions = [
   { key: "done", label: "Done" },
 ];
 
-const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
-
 export default function Tasks() {
-  const [items, setItems] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const { filteredItems: filtered, filter, setFilter, loading, addTask, toggleTask: toggle, deleteTask: remove } =
+    useTasksData();
+
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
   const [category, setCategory] = useState("general");
   const [due, setDue] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get("/tasks");
-      setItems(data || []);
-    } catch (err) {
-      console.error("Failed to load tasks:", err);
-      toast.error("Unable to load tasks");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    const onR = () => load();
-    window.addEventListener("lifeos:refresh", onR);
-    return () => window.removeEventListener("lifeos:refresh", onR);
-  }, []);
-
-  const filtered = useMemo(
-    () => (filter === "all" ? items : items.filter((i) => i.status === filter)),
-    [items, filter]
-  );
 
   const add = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    try {
-      await api.post("/tasks", { title, priority, category, due_date: due || null });
+    const res = await addTask({ title, priority, category, due_date: due || null });
+    if (res.ok) {
       setTitle("");
       setDue("");
       setPriority("medium");
       setCategory("general");
-      toast.success("Task added");
-      load();
-    } catch (err) {
-      console.error("Failed to add task:", err);
-      toast.error(err.response?.data?.error || "Could not add task");
-    }
-  };
-
-  const toggle = async (t) => {
-    const status = t.status === "done" ? "todo" : "done";
-    setItems((old) => old.map((it) => (it.id === t.id ? { ...it, status } : it)));
-    try {
-      await api.patch(`/tasks/${t.id}`, { status });
-    } catch (err) {
-      console.error("Failed to toggle task:", err);
-      toast.error("Could not update task");
-      load();
-    }
-  };
-
-  const remove = async (id) => {
-    setItems((old) => old.filter((i) => i.id !== id));
-    try {
-      await api.delete(`/tasks/${id}`);
-      toast.success("Deleted");
-    } catch (err) {
-      console.error("Failed to delete task:", err);
-      toast.error("Could not delete task");
-      load();
     }
   };
 

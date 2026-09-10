@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -11,21 +10,9 @@ import {
   TrendingUp,
   Check,
 } from "lucide-react";
-import { toast } from "sonner";
-import api from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-
-const fmt = (d) => {
-  if (!d) return "";
-  const dd = new Date(d);
-  return dd.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-};
-const fmtTime = (d) => {
-  if (!d) return "";
-  return new Date(d).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-};
-const currency = (n, c = "USD") =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: c }).format(n || 0);
+import { currency, formatDate as fmt, formatTime as fmtTime } from "../lib/formatters";
+import { useDashboardData } from "../hooks/useDashboardData";
 
 const Kpi = ({ label, value, hint, tone = "default", testid, icon: Icon }) => (
   <div className="card card-hover p-5" data-testid={testid}>
@@ -55,64 +42,8 @@ const Kpi = ({ label, value, hint, tone = "default", testid, icon: Icon }) => (
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [data, setData] = useState(null);
-  const [greeting, setGreeting] = useState("Hello");
-  const [planning, setPlanning] = useState(false);
-  const [plan, setPlan] = useState(null);
-
-  const load = async () => {
-    try {
-      const { data } = await api.get("/dashboard");
-      setData(data);
-    } catch (err) {
-      console.error("Failed to load dashboard metrics:", err);
-      toast.error("Unable to load dashboard data. Please check your connection.");
-    }
-  };
-
-  useEffect(() => {
-    const h = new Date().getHours();
-    setGreeting(
-      h < 5
-        ? "Still up"
-        : h < 12
-        ? "Good morning"
-        : h < 18
-        ? "Good afternoon"
-        : "Good evening"
-    );
-    load();
-    const onRefresh = () => load();
-    window.addEventListener("lifeos:refresh", onRefresh);
-    return () => window.removeEventListener("lifeos:refresh", onRefresh);
-  }, []);
-
-  const toggleTask = async (t) => {
-    try {
-      const status = t.status === "done" ? "todo" : "done";
-      await api.patch(`/tasks/${t.id}`, { status });
-      load();
-    } catch (err) {
-      console.error("Failed to update task:", err);
-      toast.error("Could not update task status");
-    }
-  };
-
-  const generatePlan = async () => {
-    setPlanning(true);
-    try {
-      const { data } = await api.post("/ai/plan-day");
-      setPlan(data);
-      toast.success("Daily plan generated");
-    } catch (err) {
-      console.error("AI daily planning error:", err);
-      toast.error(
-        err.response?.data?.error || "Could not generate AI plan right now. Please try again."
-      );
-    } finally {
-      setPlanning(false);
-    }
-  };
+  const { data, greeting, planning, plan, toggleTask, generatePlan, dismissPlan } =
+    useDashboardData();
 
   const c = data?.counts;
   const m = data?.money;
@@ -157,7 +88,7 @@ export default function Dashboard() {
             </div>
             <button
               className="btn btn-ghost !py-1 !px-2 text-xs"
-              onClick={() => setPlan(null)}
+              onClick={dismissPlan}
             >
               Dismiss
             </button>

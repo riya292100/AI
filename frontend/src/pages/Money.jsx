@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Plus, Trash2, Check } from "lucide-react";
-import { toast } from "sonner";
-import api from "../lib/api";
-
-const currency = (n, c = "USD") =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: c }).format(n || 0);
-const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+import { currency, formatDate as fmt, daysBetween } from "../lib/formatters";
+import { useMoneyData } from "../hooks/useMoneyData";
 
 const StatusBadge = ({ status, daysUntil }) => {
   if (status === "paid")
@@ -24,12 +19,21 @@ const StatusBadge = ({ status, daysUntil }) => {
   return <span className="chip">upcoming</span>;
 };
 
-const daysBetween = (d) => Math.round((new Date(d) - new Date()) / (1000 * 60 * 60 * 24));
-
 export default function Money() {
   const [tab, setTab] = useState("bills");
-  const [bills, setBills] = useState([]);
-  const [expenses, setExpenses] = useState([]);
+  const {
+    bills,
+    expenses,
+    monthTotal,
+    upcomingTotal,
+    byCategory,
+    addBill: createBill,
+    addExpense: createExpense,
+    toggleBillPaid: payBill,
+    deleteBill: removeBill,
+    deleteExpense: removeExp,
+  } = useMoneyData();
+
   const [billForm, setBillForm] = useState({
     name: "",
     amount: "",
@@ -39,60 +43,11 @@ export default function Money() {
   });
   const [expForm, setExpForm] = useState({ amount: "", category: "food", notes: "" });
 
-  const load = async () => {
-    try {
-      const [b, e] = await Promise.all([api.get("/bills"), api.get("/expenses")]);
-      setBills(b.data || []);
-      setExpenses(e.data || []);
-    } catch (err) {
-      console.error("Failed to load financial records:", err);
-      toast.error("Unable to load bills and expenses");
-    }
-  };
-
-  useEffect(() => {
-    load();
-    const onR = () => load();
-    window.addEventListener("lifeos:refresh", onR);
-    return () => window.removeEventListener("lifeos:refresh", onR);
-  }, []);
-
-  const monthTotal = useMemo(() => {
-    const start = new Date();
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-    return expenses
-      .filter((e) => new Date(e.date) >= start)
-      .reduce((s, e) => s + Number(e.amount || 0), 0);
-  }, [expenses]);
-
-  const upcomingTotal = useMemo(
-    () =>
-      bills
-        .filter((b) => b.status !== "paid")
-        .reduce((s, b) => s + Number(b.amount || 0), 0),
-    [bills]
-  );
-
-  const byCategory = useMemo(() => {
-    const map = {};
-    expenses.forEach((e) => {
-      const start = new Date();
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      if (new Date(e.date) >= start)
-        map[e.category] = (map[e.category] || 0) + Number(e.amount || 0);
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
-  }, [expenses]);
-
   const addBill = async (e) => {
     e.preventDefault();
     if (!billForm.name || !billForm.amount || !billForm.due_date) return;
-    try {
-      await api.post("/bills", { ...billForm, amount: parseFloat(billForm.amount) });
+    const ok = await createBill(billForm);
+    if (ok) {
       setBillForm({
         name: "",
         amount: "",
@@ -100,62 +55,15 @@ export default function Money() {
         category: "utilities",
         frequency: "monthly",
       });
-      toast.success("Bill added");
-      load();
-    } catch (err) {
-      console.error("Failed to add bill:", err);
-      toast.error(err.response?.data?.error || "Could not add bill");
     }
   };
 
   const addExpense = async (e) => {
     e.preventDefault();
     if (!expForm.amount) return;
-    try {
-      await api.post("/expenses", {
-        amount: parseFloat(expForm.amount),
-        category: expForm.category,
-        notes: expForm.notes,
-      });
+    const ok = await createExpense(expForm);
+    if (ok) {
       setExpForm({ amount: "", category: "food", notes: "" });
-      toast.success("Expense logged");
-      load();
-    } catch (err) {
-      console.error("Failed to add expense:", err);
-      toast.error(err.response?.data?.error || "Could not log expense");
-    }
-  };
-
-  const payBill = async (b) => {
-    try {
-      await api.patch(`/bills/${b.id}`, { status: "paid" });
-      toast.success(`${b.name} marked paid`);
-      load();
-    } catch (err) {
-      console.error("Failed to mark bill paid:", err);
-      toast.error("Could not update bill status");
-    }
-  };
-
-  const removeBill = async (id) => {
-    try {
-      await api.delete(`/bills/${id}`);
-      toast.success("Bill deleted");
-      load();
-    } catch (err) {
-      console.error("Failed to delete bill:", err);
-      toast.error("Could not delete bill");
-    }
-  };
-
-  const removeExp = async (id) => {
-    try {
-      await api.delete(`/expenses/${id}`);
-      toast.success("Expense removed");
-      load();
-    } catch (err) {
-      console.error("Failed to delete expense:", err);
-      toast.error("Could not delete expense");
     }
   };
 
@@ -303,6 +211,7 @@ export default function Money() {
                     <div className="font-mono font-bold text-slate-100">{currency(b.amount)}</div>
                     <button
                       onClick={() => removeBill(b.id)}
+                      data-testid={`delete-bill-${b.id}`}
                       className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1"
                     >
                       <Trash2 size={15} />
@@ -368,6 +277,7 @@ export default function Money() {
                   <div className="font-mono font-bold text-slate-100">{currency(e.amount)}</div>
                   <button
                     onClick={() => removeExp(e.id)}
+                    data-testid={`delete-expense-${e.id}`}
                     className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1"
                   >
                     <Trash2 size={15} />

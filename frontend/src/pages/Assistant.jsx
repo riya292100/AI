@@ -126,10 +126,11 @@ export default function Assistant() {
             <div className="font-display font-bold text-lg">How can I help today?</div>
             <div className="text-sm text-slate-400 mt-1">Try one of these to get started.</div>
             <div className="mt-5 grid gap-2">
-              {suggestions.map((s) => (
+              {suggestions.map((s, idx) => (
                 <button
                   key={s}
                   onClick={() => send(s)}
+                  data-testid={`chat-suggestion-${idx}`}
                   className="text-left px-4 py-3 rounded-lg border text-[13px] hover:border-indigo-500 hover:bg-indigo-500/5 transition-colors"
                   style={{ borderColor: "var(--border)" }}
                 >
@@ -178,6 +179,7 @@ export default function Assistant() {
           send();
         }}
         className="mt-4 flex gap-2"
+        data-testid="chat-form"
       >
         <input
           className="input flex-1"
@@ -185,8 +187,14 @@ export default function Assistant() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={busy}
+          data-testid="chat-input"
         />
-        <button type="submit" className="btn btn-primary" disabled={busy || !input.trim()}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={busy || !input.trim()}
+          data-testid="chat-submit"
+        >
           <Send size={15} />
         </button>
       </form>
