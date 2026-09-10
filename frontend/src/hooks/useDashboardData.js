@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import api from "../lib/api";
+import { logError } from "../lib/logger";
 
 /**
  * Custom hook to manage LifeOS dashboard metrics, AI planning, and task toggles.
@@ -29,7 +30,7 @@ export function useDashboardData() {
       const res = await api.get("/dashboard");
       setData(res.data || null);
     } catch (err) {
-      console.error("Failed to load dashboard metrics:", err);
+      logError("useDashboardData:load", err);
       toast.error("Unable to load dashboard data. Please check your connection.");
     } finally {
       setLoading(false);
@@ -52,7 +53,7 @@ export function useDashboardData() {
       await api.patch(`/tasks/${task.id}`, { status: nextStatus });
       await load();
     } catch (err) {
-      console.error("Failed to update task:", err);
+      logError("useDashboardData:toggleTask", err);
       toast.error("Could not update task status");
     }
   };
@@ -64,7 +65,7 @@ export function useDashboardData() {
       setPlan(res.data || null);
       toast.success("Daily plan generated");
     } catch (err) {
-      console.error("Failed to generate day plan:", err);
+      logError("useDashboardData:generatePlan", err);
       toast.error("Could not generate daily plan. Try again later.");
     } finally {
       setPlanning(false);

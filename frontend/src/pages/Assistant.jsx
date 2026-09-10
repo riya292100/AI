@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Sparkles, User, Bot } from "lucide-react";
 import { toast } from "sonner";
 import api, { API } from "../lib/api";
+import { logError } from "../lib/logger";
 
 const suggestions = [
   "What should I focus on today?",
@@ -22,7 +23,7 @@ export default function Assistant() {
         const { data } = await api.get("/ai/messages");
         setMessages(data || []);
       } catch (err) {
-        console.error("Failed to load past chat messages:", err);
+        logError("Assistant:loadMessages", err);
       }
     })();
   }, []);
@@ -85,7 +86,7 @@ export default function Assistant() {
         }
       }
     } catch (e) {
-      console.error("Assistant chat error:", e);
+      logError("Assistant:chat", e);
       toast.error("Could not complete response with assistant");
       setMessages((m) =>
         m.map((x, i) =>

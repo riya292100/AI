@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { logError } from "../lib/logger";
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,7 +13,7 @@ export class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Uncaught application error:", error, errorInfo);
+    logError("ErrorBoundary", error, { componentStack: errorInfo?.componentStack });
     this.setState({ errorInfo });
   }
 

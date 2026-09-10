@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import api from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-
-const daysBetween = (d) => Math.round((new Date(d) - new Date()) / (1000 * 60 * 60 * 24));
+import { daysBetween } from "../lib/formatters";
+import { logError } from "../lib/logger";
 
 function DocumentsPanel() {
   const [items, setItems] = useState([]);
@@ -24,7 +24,7 @@ function DocumentsPanel() {
       const res = await api.get("/documents");
       setItems(res.data || []);
     } catch (err) {
-      console.error("Failed to load documents:", err);
+      logError("DocumentsPanel:load", err);
       toast.error("Could not load documents");
     }
   };
@@ -42,7 +42,7 @@ function DocumentsPanel() {
       setForm({ name: "", type: "id", expiry_date: "" });
       load();
     } catch (err) {
-      console.error("Failed to save document:", err);
+      logError("DocumentsPanel:add", err);
       toast.error(err.response?.data?.error || "Could not save document");
     }
   };
@@ -53,7 +53,7 @@ function DocumentsPanel() {
       toast.success("Document removed");
       load();
     } catch (err) {
-      console.error("Failed to remove document:", err);
+      logError("DocumentsPanel:removeDoc", err);
       toast.error("Could not delete document");
     }
   };
@@ -70,11 +70,13 @@ function DocumentsPanel() {
           placeholder="Passport, insurance card…"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
+          data-testid="doc-name-input"
         />
         <select
           className="select md:w-[150px]"
           value={form.type}
           onChange={(e) => setForm({ ...form, type: e.target.value })}
+          data-testid="doc-type-select"
         >
           <option value="id">ID</option>
           <option value="insurance">Insurance</option>
@@ -87,8 +89,9 @@ function DocumentsPanel() {
           className="input md:w-[170px]"
           value={form.expiry_date}
           onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
+          data-testid="doc-expiry-input"
         />
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" data-testid="doc-submit-button">
           <Plus size={14} /> Save
         </button>
       </form>
@@ -122,6 +125,7 @@ function DocumentsPanel() {
               {d.expiry_date && <span className={`chip ${tone}`}>expires in {dU}d</span>}
               <button
                 onClick={() => removeDoc(d.id)}
+                data-testid={`delete-doc-${d.id}`}
                 className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-300 p-1.5"
               >
                 <Trash2 size={14} />
@@ -143,7 +147,7 @@ function HabitsPanel() {
       const res = await api.get("/habits");
       setItems(res.data || []);
     } catch (err) {
-      console.error("Failed to load habits:", err);
+      logError("HabitsPanel:load", err);
       toast.error("Could not load habits");
     }
   };
@@ -161,7 +165,7 @@ function HabitsPanel() {
       toast.success("Habit added");
       load();
     } catch (err) {
-      console.error("Failed to add habit:", err);
+      logError("HabitsPanel:add", err);
       toast.error(err.response?.data?.error || "Could not add habit");
     }
   };
@@ -172,7 +176,7 @@ function HabitsPanel() {
       await api.post(`/habits/${h.id}/log`, { date: today });
       load();
     } catch (err) {
-      console.error("Failed to log habit:", err);
+      logError("HabitsPanel:toggleToday", err);
       toast.error("Could not log habit");
     }
   };
@@ -183,7 +187,7 @@ function HabitsPanel() {
       toast.success("Habit removed");
       load();
     } catch (err) {
-      console.error("Failed to delete habit:", err);
+      logError("HabitsPanel:removeHabit", err);
       toast.error("Could not delete habit");
     }
   };
@@ -196,8 +200,9 @@ function HabitsPanel() {
           placeholder="Morning walk, read 20 min…"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          data-testid="habit-name-input"
         />
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" data-testid="habit-submit-button">
           <Plus size={14} /> Add
         </button>
       </form>
@@ -222,6 +227,7 @@ function HabitsPanel() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => toggleToday(h)}
+                    data-testid={`toggle-habit-${h.id}`}
                     className={`btn !py-1.5 !px-3 text-xs ${
                       doneToday ? "btn-primary" : "btn-ghost border border-slate-700"
                     }`}
@@ -230,6 +236,7 @@ function HabitsPanel() {
                   </button>
                   <button
                     onClick={() => removeHabit(h.id)}
+                    data-testid={`delete-habit-${h.id}`}
                     className="text-slate-500 hover:text-red-400 p-1"
                   >
                     <Trash2 size={14} />
@@ -253,7 +260,7 @@ function ShoppingPanel() {
       const res = await api.get("/shopping");
       setItems(res.data || []);
     } catch (err) {
-      console.error("Failed to load shopping list:", err);
+      logError("ShoppingPanel:load", err);
       toast.error("Could not load shopping list");
     }
   };
@@ -271,7 +278,7 @@ function ShoppingPanel() {
       toast.success("Item added");
       load();
     } catch (err) {
-      console.error("Failed to add shopping item:", err);
+      logError("ShoppingPanel:add", err);
       toast.error(err.response?.data?.error || "Could not add item");
     }
   };
@@ -281,7 +288,7 @@ function ShoppingPanel() {
       await api.patch(`/shopping/${id}`);
       load();
     } catch (err) {
-      console.error("Failed to toggle shopping item:", err);
+      logError("ShoppingPanel:toggle", err);
       toast.error("Could not update item");
     }
   };
@@ -291,7 +298,7 @@ function ShoppingPanel() {
       await api.delete(`/shopping/${id}`);
       load();
     } catch (err) {
-      console.error("Failed to delete shopping item:", err);
+      logError("ShoppingPanel:remove", err);
       toast.error("Could not delete item");
     }
   };
@@ -304,8 +311,9 @@ function ShoppingPanel() {
           placeholder="Oat milk, coffee beans…"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          data-testid="shopping-name-input"
         />
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" data-testid="shopping-submit-button">
           <Plus size={14} /> Add
         </button>
       </form>
@@ -322,6 +330,7 @@ function ShoppingPanel() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => toggle(it.id)}
+                data-testid={`toggle-shopping-${it.id}`}
                 className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                   it.checked
                     ? "bg-emerald-500/20 border-emerald-400 text-emerald-300"
@@ -340,6 +349,7 @@ function ShoppingPanel() {
             </div>
             <button
               onClick={() => remove(it.id)}
+              data-testid={`delete-shopping-${it.id}`}
               className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1"
             >
               <Trash2 size={14} />
@@ -372,6 +382,7 @@ export default function More() {
         </div>
         <button
           onClick={handleLogout}
+          data-testid="logout-button"
           className="btn btn-ghost text-red-400 hover:text-red-300 flex items-center gap-2 text-xs"
         >
           <LogOut size={14} /> Sign out ({user?.name || user?.email})
@@ -381,6 +392,7 @@ export default function More() {
       <div className="flex gap-2 mb-6 border-b border-slate-800 pb-2">
         <button
           onClick={() => setTab("documents")}
+          data-testid="tab-documents"
           className={`px-3 py-1.5 rounded-lg text-sm ${
             tab === "documents" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"
           }`}
@@ -389,6 +401,7 @@ export default function More() {
         </button>
         <button
           onClick={() => setTab("habits")}
+          data-testid="tab-habits"
           className={`px-3 py-1.5 rounded-lg text-sm ${
             tab === "habits" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"
           }`}
@@ -397,6 +410,7 @@ export default function More() {
         </button>
         <button
           onClick={() => setTab("shopping")}
+          data-testid="tab-shopping"
           className={`px-3 py-1.5 rounded-lg text-sm ${
             tab === "shopping" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"
           }`}

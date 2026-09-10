@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import api from "../lib/api";
 import { monthMatrix, isSameDay } from "../lib/formatters";
+import { logError } from "../lib/logger";
 
 /**
- * Custom hook to manage calendar month navigation, appointment/task events, and scheduling.
+ * Custom hook to manage calendar views, month navigation, day selections, and events.
  */
 export function useCalendarData() {
-  const today = useMemo(() => new Date(), []);
-  const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selected, setSelected] = useState(today);
+  const [cursor, setCursor] = useState(() => new Date());
+  const [selected, setSelected] = useState(() => new Date());
   const [appts, setAppts] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,7 @@ export function useCalendarData() {
       const taskList = Array.isArray(t.data) ? t.data : t.data?.items || [];
       setTasks(taskList);
     } catch (err) {
-      console.error("Failed to load appointments and tasks:", err);
+      logError("useCalendarData:load", err);
       toast.error("Unable to load calendar events");
     } finally {
       setLoading(false);
@@ -71,7 +71,7 @@ export function useCalendarData() {
       await load();
       return true;
     } catch (err) {
-      console.error("Failed to create appointment:", err);
+      logError("useCalendarData:addAppointment", err);
       toast.error("Could not create event");
       return false;
     }
@@ -84,7 +84,7 @@ export function useCalendarData() {
       await load();
       return true;
     } catch (err) {
-      console.error("Failed to delete appointment:", err);
+      logError("useCalendarData:deleteAppointment", err);
       toast.error("Could not delete event");
       return false;
     }

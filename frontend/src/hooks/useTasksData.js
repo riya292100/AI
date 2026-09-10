@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import api from "../lib/api";
+import { logError } from "../lib/logger";
 
 /**
  * Custom hook to manage LifeOS task loading, filtering, optimistic updates, and deletion.
@@ -17,7 +18,7 @@ export function useTasksData() {
       const list = Array.isArray(data) ? data : data?.items || [];
       setItems(list);
     } catch (err) {
-      console.error("Failed to load tasks:", err);
+      logError("useTasksData:load", err);
       toast.error("Unable to load tasks");
     } finally {
       setLoading(false);
@@ -50,7 +51,7 @@ export function useTasksData() {
       toast.success("Task added");
       return { ok: true, data };
     } catch (err) {
-      console.error("Failed to add task:", err);
+      logError("useTasksData:addTask", err);
       const msg = err.response?.data?.error || err.response?.data?.detail || "Could not add task";
       toast.error(msg);
       return { ok: false, error: msg };
@@ -70,7 +71,7 @@ export function useTasksData() {
     try {
       await api.patch(`/tasks/${task.id}`, { status: nextStatus });
     } catch (err) {
-      console.error("Failed to toggle task:", err);
+      logError("useTasksData:toggleTask", err);
       toast.error("Could not update task");
       setItems(previous); // Revert on failure
     }
@@ -86,7 +87,7 @@ export function useTasksData() {
       toast.success("Deleted");
       return true;
     } catch (err) {
-      console.error("Failed to delete task:", err);
+      logError("useTasksData:deleteTask", err);
       toast.error("Could not delete task");
       setItems(previous); // Revert on failure
       return false;

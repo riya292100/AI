@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import api from "../lib/api";
+import { logError } from "../lib/logger";
 
 /**
  * Custom hook to manage financial records (bills & expenses), summaries, and aggregations.
@@ -17,7 +18,7 @@ export function useMoneyData() {
       setBills(b.data || []);
       setExpenses(e.data || []);
     } catch (err) {
-      console.error("Failed to load financial records:", err);
+      logError("useMoneyData:load", err);
       toast.error("Unable to load bills and expenses");
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ export function useMoneyData() {
       await load();
       return true;
     } catch (err) {
-      console.error("Failed to add bill:", err);
+      logError("useMoneyData:addBill", err);
       toast.error(err.response?.data?.error || "Could not add bill");
       return false;
     }
@@ -91,7 +92,7 @@ export function useMoneyData() {
       await load();
       return true;
     } catch (err) {
-      console.error("Failed to log expense:", err);
+      logError("useMoneyData:addExpense", err);
       toast.error("Could not log expense");
       return false;
     }
@@ -104,7 +105,7 @@ export function useMoneyData() {
       await load();
       return true;
     } catch (err) {
-      console.error("Failed to mark bill paid:", err);
+      logError("useMoneyData:toggleBillPaid", err);
       toast.error("Could not update bill");
       return false;
     }
@@ -116,7 +117,7 @@ export function useMoneyData() {
       toast.success("Bill deleted");
       await load();
     } catch (err) {
-      console.error("Failed to delete bill:", err);
+      logError("useMoneyData:deleteBill", err);
       toast.error("Could not delete bill");
     }
   };
@@ -127,7 +128,7 @@ export function useMoneyData() {
       toast.success("Expense deleted");
       await load();
     } catch (err) {
-      console.error("Failed to delete expense:", err);
+      logError("useMoneyData:deleteExpense", err);
       toast.error("Could not delete expense");
     }
   };
