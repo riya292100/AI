@@ -114,11 +114,12 @@ async def verify_and_provision_firebase_user(token: str) -> Optional[Dict[str, A
 
 async def get_current_user(request: Request) -> Dict[str, Any]:
     """FastAPI dependency to extract and validate the authenticated user (Firebase ID Token or JWT)."""
-    token = request.cookies.get("access_token")
+    token = None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
     if not token:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:].strip()
+        token = request.cookies.get("access_token")
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
